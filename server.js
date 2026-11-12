@@ -72,7 +72,7 @@ db.exec(`
   );
 `);
 
-// Admin akkauntini yaratish (amir / ayo)
+// Standart Admin akkaunti (amir / ayo)
 const adminCheck = db.prepare('SELECT id FROM users WHERE LOWER(name) = ? OR LOWER(email) = ?').get(ADMIN_LOGIN, ADMIN_LOGIN);
 if (!adminCheck) {
   const hash = bcrypt.hashSync(ADMIN_PASS, 10);
@@ -104,7 +104,7 @@ function logActivity(userId, userName, action, detail) {
 
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
-app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 150, message: { error: 'So‘rovlar soni oshdi. 1 daqiqa kuting.' } }));
+app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 150, message: { error: 'So‘rovlar ko‘paydi, biroz kuting.' } }));
 
 function getUser(req) {
   const token = req.cookies.auth_token;
@@ -121,9 +121,9 @@ function getToday() { return new Date().toISOString().split('T')[0]; }
 // Muloyim Amir AI
 async function generateAI(prompt) {
   if (!aiClient) {
-    return `[Amir AI]: Assalomu alaykum, aziz o‘quvchim! Hozirda tizim demo rejimida. API ulangach, darslar to‘liq beriladi.`;
+    return `[Amir AI]: Assalomu alaykum, aziz o‘quvchim! Hozirda tizim sinov rejimida ishlamoqda. Gemini API kaliti ulangach, barcha darslar to‘liq tushuntirib beriladi.`;
   }
-  const systemInstruction = `Sen Amir AI san. O'quvchilarga 50+ til, IELTS, CEFR va maktab fanlarini o'rgatuvchi juda muloyim, xushmuomala, rag'batlantiruvchi va chuqur bilimli ustozsan. Har doim o'quvchiga mehr bilan va tushunarli tilda dars o't.`;
+  const systemInstruction = `Sen Amir AI san. O'quvchilarga 50+ til, IELTS, CEFR va barcha maktab fanlarini o'rgatuvchi juda muloyim, xushmuomala, rag'batlantiruvchi va chuqur bilimli ustozsan. Har doim o'quvchiga mehr va samimiyat bilan dars o't.`;
   try {
     const res = await aiClient.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -154,7 +154,7 @@ app.post('/api/register', async (req, res) => {
 
     const token = jwt.sign({ id: r.lastInsertRowid }, JWT_SECRET, { expiresIn: '30d' });
     res.cookie('auth_token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 30 * 864e5 });
-    logActivity(r.lastInsertRowid, name, 'Ro‘yxatdan o‘tdi', 'Yangi hisob ochildi');
+    logActivity(r.lastInsertRowid, name, 'Ro‘yxatdan o‘tdi', 'Yangi hisob yaratildi');
 
     res.json({
       ok: true,
@@ -182,7 +182,7 @@ app.post('/api/login', async (req, res) => {
 
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
     res.cookie('auth_token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 30 * 864e5 });
-    logActivity(user.id, user.name, 'Kirish', 'Tizimga muvaffaqiyatli kirdi');
+    logActivity(user.id, user.name, 'Kirish', 'Tizimga kirdi');
 
     const used = user.last_active_date === getToday() ? user.seconds_used : 0;
     res.json({
@@ -490,8 +490,8 @@ label{display:block;font-weight:700;font-size:14px;margin-top:12px}
 table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid var(--ln);padding:10px 12px;text-align:left;font-size:14px}th{background:rgba(25,211,230,.1);color:var(--br)}
 
 /* Boshlang'ich Kirish Darvozasi (Gate Modal) */
-#gate-overlay{position:fixed;inset:0;background:rgba(6,11,20,.94);backdrop-filter:blur(16px);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
-.gate-box{width:min(460px,100%);background:linear-gradient(160deg,rgba(25,211,230,.1),rgba(12,22,38,.98));border:1px solid rgba(25,211,230,.3);border-radius:22px;padding:28px;box-shadow:0 0 50px rgba(25,211,230,.25)}
+#gate-overlay{position:fixed;inset:0;background:rgba(6,11,20,.95);backdrop-filter:blur(16px);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.gate-box{width:min(460px,100%);background:linear-gradient(160deg,rgba(25,211,230,.1),rgba(12,22,38,.98));border:1px solid rgba(25,211,230,.35);border-radius:22px;padding:28px;box-shadow:0 0 50px rgba(25,211,230,.3)}
 .gate-box h2{margin:0 0 6px;color:#fff}
 .gate-box p{color:var(--mut);margin:0 0 16px;font-size:14px}
 .gate-switch{color:var(--br);cursor:pointer;font-weight:700;text-decoration:underline;margin-top:14px;display:inline-block}
@@ -501,7 +501,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid
 </head>
 <body>
 
-<div id="gate-overlay" style="display:none">
+<div id="gate-overlay">
   <div class="gate-box">
     <div id="gate-login-view">
       <h2>Kirish</h2>
@@ -571,7 +571,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid
 </div>
 
 <script>
-var $ = s => document.querySelector(s);
+var $ = function(s){ return document.querySelector(s); };
 var ME = null, SETTINGS = {}, plan = 'free', used = 0;
 var LANGS = "Ingliz,Rus,Nemis,Fransuz,Ispan,Italyan,Portugal,Turk,Arab,Xitoy,Yapon,Koreys,Hind,Fors,Ukrain,Polyak,Chex,Slovak,Venger,Rumin,Bolgar,Serb,Xorvat,Yunon,Golland,Shved,Norveg,Dat,Fin,Eston,Latish,Litva,Gruzin,Arman,Ozarbayjon,Qozoq,Qirgʻiz,Turkman,Tojik,Urdu,Bengal,Tamil,Tailand,Vetnam,Indoneziya,Malay,Filipin,Ivrit,Suahili,Afrikaans,Irland,Island,Belarus,Mongol,Pushtu,Katalan,Lotin,Esperanto".split(",");
 var SUBJ = ["Matematika","Ona tili","Ingliz tili","Rus tili","Fizika","Kimyo","Biologiya","Tarix","Geografiya","Informatika","Adabiyot"];
@@ -585,11 +585,22 @@ var LVL = [
   ["C2","C2: Master",["Muzokara","Yuqori ritorika","Tarjima","Dialekt","Adabiy asarlar","Ilmiy munozara","Ijodiy yozuv","Notiqlik","Imtihon strategiyasi","Loyiha"]]
 ];
 
-function API(u,b){
-  return fetch(u,b===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','x-admin-key':localStorage.getItem('adm_key')||''},body:JSON.stringify(b)})
-  .then(r=>r.json().then(j=>{if(!r.ok)throw new Error(j.error||'Xato yuz berdi');return j}));
+function API(u, b){
+  return fetch(u, b === undefined ? {} : {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-key': localStorage.getItem('adm_key') || '' },
+    body: JSON.stringify(b)
+  }).then(function(r){
+    return r.json().then(function(j){
+      if(!r.ok) throw new Error(j.error || 'Xato yuz berdi');
+      return j;
+    });
+  });
 }
-function opts(a){return a.map(x=>'<option value="'+x+'">'+x+'</option>').join("");}
+
+function opts(a){
+  return a.map(function(x){ return '<option value="' + x + '">' + x + '</option>'; }).join("");
+}
 
 function switchGate(to){
   if(to === 'reg'){
@@ -604,11 +615,11 @@ function switchGate(to){
 function submitGateLogin(){
   var l = $("#gl-login").value, p = $("#gl-pass").value;
   $("#gl-err").textContent = "";
-  API('/api/login', { login: l, password: p }).then(j => {
+  API('/api/login', { login: l, password: p }).then(function(j){
     ME = j.user; plan = j.plan; used = j.used;
     $("#gate-overlay").style.display = 'none';
     updateMe(); show('home');
-  }).catch(e => { $("#gl-err").textContent = e.message; });
+  }).catch(function(e){ $("#gl-err").textContent = e.message; });
 }
 
 function submitGateReg(){
@@ -616,14 +627,14 @@ function submitGateReg(){
   $("#gr-err").textContent = ""; $("#gr-ok").textContent = "";
   if(!chk){ $("#gr-err").textContent = 'Iltimos, "Login va parolimni eslab qoldim" katakchasini belgilang!'; return; }
   
-  API('/api/register', { name: n, email: e, password: p, confirmed: chk }).then(j => {
+  API('/api/register', { name: n, email: e, password: p, confirmed: chk }).then(function(j){
     $("#gr-ok").textContent = "Akkaunt muvaffaqiyatli yaratildi! Saytga yo‘naltirilmoqda...";
-    setTimeout(() => {
+    setTimeout(function(){
       ME = j.user; plan = j.plan; used = j.used;
       $("#gate-overlay").style.display = 'none';
       updateMe(); show('home');
     }, 1200);
-  }).catch(err => { $("#gr-err").textContent = err.message; });
+  }).catch(function(err){ $("#gr-err").textContent = err.message; });
 }
 
 var NAV = [
@@ -631,36 +642,39 @@ var NAV = [
   ["cert","Sertifikatlar"],["arena","Jonli Jang (Arena)"],["league","Ligalar & Sovrinlar"],
   ["teach","Taqdimot & Slayd"],["premium","Premium olish"],["admin","Admin Panel"]
 ];
-$("#nav").insertAdjacentHTML("beforeend", NAV.map(n=>'<button class="n" data-v="'+n[0]+'" type="button">'+n[1]+'</button>').join(""));
-$("#nav").onclick = e => { var v = e.target.dataset && e.target.dataset.v; if(v) show(v); };
+
+function renderNav(){
+  $("#nav").innerHTML = '<div class="logo"><svg width="34" height="34" viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="var(--br)"/><path d="M20 7 35 15 20 23 5 15Z" fill="var(--bi)"/><path d="M11 20v6c0 2.5 4 4.5 9 4.5s9-2 9-4.5v-6l-9 4.5z" fill="var(--bi)" opacity=".8"/></svg><span>Teacher <b>Amir</b></span></div>' +
+  NAV.map(function(n){ return '<button class="n" data-v="' + n[0] + '" type="button">' + n[1] + '</button>'; }).join("");
+}
 
 var V = {
   home: function(){
     return '<h1>Xush kelibsiz, Teacher Amir platformasiga!</h1>' +
     '<p class="sub">50+ til, IELTS/CEFR sertifikatlari, maktab fanlari va real-vaqtli bilim janglari arenasi.</p>' +
     '<div class="grid">' +
-      '<button class="card" onclick="show(\\'course\\')"><h3>🌐 50+ Chet tillari</h3><p>A1 dan C2 gacha noldan mukammallikkacha.</p></button>' +
-      '<button class="card" onclick="show(\\'cert\\')"><h3>🎓 Sertifikatlar</h3><p>IELTS, CEFR, TOEFL, HSK bo‘yicha Speaking va Mock imtihonlar.</p></button>' +
-      '<button class="card" onclick="show(\\'arena\\')"><h3>⚔️ Bilimlar Jangi</h3><p>Do‘stlar bilan jonli duel qilib ball to‘plang!</p></button>' +
-      '<button class="card" onclick="show(\\'league\\')"><h3>🏆 Ligalar & Sovrinlar</h3><p>1-o‘rinni oling va tekin 1 yillik Premium yuting!</p></button>' +
+      '<button class="card" data-go="course"><h3>🌐 50+ Chet tillari</h3><p>A1 dan C2 gacha noldan mukammallikkacha.</p></button>' +
+      '<button class="card" data-go="cert"><h3>🎓 Sertifikatlar</h3><p>IELTS, CEFR, TOEFL, HSK bo‘yicha Speaking va Mock imtihonlar.</p></button>' +
+      '<button class="card" data-go="arena"><h3>⚔️ Bilimlar Jangi</h3><p>Do‘stlar bilan jonli duel qilib ball to‘plang!</p></button>' +
+      '<button class="card" data-go="league"><h3>🏆 Ligalar & Sovrinlar</h3><p>1-o‘rinni oling va tekin 1 yillik Premium yuting!</p></button>' +
     '</div>';
   },
   course: function(){
     return '<h1>50+ Xorijiy tillar kursi</h1><p class="sub">Til va darajani tanlang. Darslar lug‘at, grammatika va testlardan iborat.</p>' +
     '<div class="form"><label>Til:</label><select id="c-lang">' + opts(LANGS) + '</select></div>' +
     '<div style="display:flex;gap:6px;margin:16px 0;flex-wrap:wrap">' +
-      LVL.map((x,i)=>'<button class="btn '+(i===0?'':'sun')+'" style="padding:6px 14px" onclick="setLvl('+i+',this)">'+x[0]+'</button>').join("") +
-    '</div><h3 id="lvl-title">'+LVL[0][1]+'</h3>' +
-    '<div class="grid" id="c-units">' + LVL[0][2].map((u,i)=>'<button class="card" onclick="openLesson(\\''+u+'\\')"><span class="tag">'+(i+1)+'-dars</span><h3>'+u+'</h3></button>').join("") + '</div>' +
+      LVL.map(function(x,i){ return '<button class="btn ' + (i===0?'':'sun') + '" style="padding:6px 14px" onclick="setLvl(' + i + ',this)">' + x[0] + '</button>'; }).join("") +
+    '</div><h3 id="lvl-title">' + LVL[0][1] + '</h3>' +
+    '<div class="grid" id="c-units">' + LVL[0][2].map(function(u,i){ return '<button class="card" onclick="openLesson(\\'' + u + '\\')"><span class="tag">' + (i+1) + '-dars</span><h3>' + u + '</h3></button>'; }).join("") + '</div>' +
     '<div class="out" id="o"></div>';
   },
   school: function(){
     return '<h1>Onlayn Maktab</h1><p class="sub">1–11-sinf fanlari darslik formatida.</p>' +
-    '<div class="form"><label>Sinf:</label><select id="s-gr">' + [1,2,3,4,5,6,7,8,9,10,11].map(x=>'<option>'+x+'-sinf</option>').join("") + '</select></div>' +
+    '<div class="form"><label>Sinf:</label><select id="s-gr">' + [1,2,3,4,5,6,7,8,9,10,11].map(function(x){ return '<option>' + x + '-sinf</option>'; }).join("") + '</select></div>' +
     '<h2>Fanlar</h2><div class="grid">' +
-    SUBJ.map(s => {
-      var isFree = (SETTINGS.free_subjects || []).includes(s);
-      return '<button class="card" onclick="openSchool(\\''+s+'\\')"><span class="tag '+(isFree?'':'pro')+'">'+(isFree?'Bepul':'Premium')+'</span><h3>'+s+'</h3></button>';
+    SUBJ.map(function(s){
+      var isFree = (SETTINGS.free_subjects || []).indexOf(s) > -1;
+      return '<button class="card" onclick="openSchool(\\'' + s + '\\')"><span class="tag ' + (isFree?'':'pro') + '">' + (isFree?'Bepul':'Premium') + '</span><h3>' + s + '</h3></button>';
     }).join("") + '</div><label style="margin-top:14px">Mavzu:</label><input id="s-tp" class="form" placeholder="Masalan: Tenglamalar"><div class="out" id="o"></div>';
   },
   cert: function(){
@@ -681,13 +695,13 @@ var V = {
   arena: function(){
     return '<h1>Bilimlar Arenasi (Jonli Jang)</h1><p class="sub">Do‘stlaringiz bilan xona ochib, bir-biringizga qarshi duel qiling!</p>' +
     '<div class="form card" id="ar-box">' +
-      '<label>Ismingiz:</label><input id="ar-name" value="'+(ME?ME.name:'')+'">' +
+      '<label>Ismingiz:</label><input id="ar-name" value="' + (ME ? ME.name : '') + '">' +
       '<label>Xona kodi:</label><input id="ar-code" placeholder="4 xonali kod">' +
       '<p style="margin-top:14px"><button class="btn" onclick="createRoom()">Xona yaratish</button> <button class="btn sun" onclick="joinRoom()">Xonaga kirish</button></p>' +
     '</div><div id="ar-live"></div>';
   },
   league: function(){
-    return '<h1>Ligalar & Sovrinlar</h1><div class="alert-prize">🎁 <b>Joriy mavsum sovrini:</b> '+(SETTINGS.season_prize||'1-o‘ringa 1 yillik bepul Premium!')+'</div>' +
+    return '<h1>Ligalar & Sovrinlar</h1><div class="alert-prize">🎁 <b>Joriy mavsum sovrini:</b> ' + (SETTINGS.season_prize || '1-o‘ringa 1 yillik bepul Premium!') + '</div>' +
     '<div class="grid">' +
       '<div class="card"><h3>Bronza</h3><p>0–49 ball</p></div><div class="card"><h3>Kumush</h3><p>50–199 ball</p></div>' +
       '<div class="card"><h3>Oltin</h3><p>200–499 ball</p></div><div class="card"><h3>Brilliant</h3><p>500+ ball</p></div>' +
@@ -707,8 +721,8 @@ var V = {
       '<h3>To‘lov va faollashtirish:</h3>' +
       '<p>1. Administratorga qo‘ng‘iroq qiling yoki Telegram orqali yozing.</p>' +
       '<p>2. To‘lov amalga oshirilgach, administrator hisobingizni darhol Premium qiladi.</p>' +
-      '<p>📞 <b>Telefon:</b> <a href="tel:'+SETTINGS.admin_phone+'" style="color:var(--br)">'+SETTINGS.admin_phone+'</a></p>' +
-      '<p>💬 <b>Telegram:</b> <a href="https://t.me/'+(SETTINGS.admin_telegram||'').replace('@','')+'" target="_blank" style="color:var(--br)">'+SETTINGS.admin_telegram+'</a></p>' +
+      '<p>📞 <b>Telefon:</b> <a href="tel:' + (SETTINGS.admin_phone || '') + '" style="color:var(--br)">' + (SETTINGS.admin_phone || '') + '</a></p>' +
+      '<p>💬 <b>Telegram:</b> <a href="https://t.me/' + ((SETTINGS.admin_telegram || '').replace('@','')) + '" target="_blank" style="color:var(--br)">' + (SETTINGS.admin_telegram || '') + '</a></p>' +
     '</div>';
   },
   admin: function(){
@@ -724,21 +738,22 @@ var V = {
 
 function show(k){
   $("#v").innerHTML = V[k]();
-  [].forEach.call(document.querySelectorAll("#nav .n"), b => b.setAttribute("aria-current", b.dataset.v === k));
+  [].forEach.call(document.querySelectorAll("#nav .n"), function(b){
+    b.setAttribute("aria-current", b.dataset.v === k);
+  });
   var pb = $("#prize_banner");
   pb.innerHTML = (ME && ME.prize_msg) ? '<div class="alert-prize">🎉 <b>Mukofotingiz:</b> ' + ME.prize_msg + '</div>' : '';
   if(k === 'league') loadLeague();
   if(k === 'teach'){
-    $("#f-sl").onsubmit = e => {
+    $("#f-sl").onsubmit = function(e){
       e.preventDefault();
       var t = $("#sl-tp").value;
       $("#sl-res").innerHTML = "<p>Slaydlar tayyorlanmoqda...</p>";
-      API('/api/ai', { prompt: '"' + t + '" mavzusida 5 ta slayd tayyorla. Format faqat JSON: [{"title":"Nom","points":["band1","band2"]}]' }).then(j => {
+      API('/api/ai', { prompt: '"' + t + '" mavzusida 5 ta slayd tayyorla. Format faqat JSON: [{"title":"Nom","points":["band1","band2"]}]' }).then(function(j){
         try {
           var clean = j.text.split(String.fromCharCode(96,96,96)+'json').join('').split(String.fromCharCode(96,96,96)).join('').trim();
           renderSlides(JSON.parse(clean), t);
-        }
-        catch(err) { $("#sl-res").innerHTML = "<p>Qayta urinib ko‘ring.</p>"; }
+        } catch(err) { $("#sl-res").innerHTML = "<p>Qayta urinib ko‘ring.</p>"; }
       });
     };
   }
@@ -750,8 +765,8 @@ function updateMe(){
 }
 
 function doLogout(){
-  API('/api/logout',{}).then(()=>{
-    ME=null; plan='free'; updateMe();
+  API('/api/logout',{}).then(function(){
+    ME = null; plan = 'free'; updateMe();
     $("#gate-overlay").style.display = 'flex';
     switchGate('login');
   });
@@ -760,28 +775,31 @@ function doLogout(){
 var curLvl = 0;
 function setLvl(i, b){
   curLvl = i;
-  [].forEach.call(b.parentNode.children, x => x.className = "btn sun");
+  [].forEach.call(b.parentNode.children, function(x){ x.className = "btn sun"; });
   b.className = "btn";
   $("#lvl-title").textContent = LVL[i][1];
-  $("#c-units").innerHTML = LVL[i][2].map((u, idx) => '<button class="card" onclick="openLesson(\\''+u+'\\')"><span class="tag">'+(idx+1)+'-dars</span><h3>'+u+'</h3></button>').join("");
+  $("#c-units").innerHTML = LVL[i][2].map(function(u, idx){ return '<button class="card" onclick="openLesson(\\'' + u + '\\')"><span class="tag">' + (idx+1) + '-dars</span><h3>' + u + '</h3></button>'; }).join("");
 }
+
 function openLesson(u){
   var o = $("#o"); o.textContent = "Ustoz Amir dars tayyorlamoqda...";
-  API('/api/lesson', { lang: $("#c-lang").value, level: LVL[curLvl][0], unit: u }).then(j => {
+  API('/api/lesson', { lang: $("#c-lang").value, level: LVL[curLvl][0], unit: u }).then(function(j){
     o.textContent = j.text; o.scrollIntoView({ behavior: 'smooth' });
-  }).catch(e => { o.textContent = "Xato: " + e.message; });
+  }).catch(function(e){ o.textContent = "Xato: " + e.message; });
 }
+
 function openSchool(s){
   var o = $("#o"); o.textContent = "Ustoz Amir tushuntirmoqda...";
-  API('/api/school', { grade: $("#s-gr").value, subject: s, topic: $("#s-tp").value }).then(j => {
+  API('/api/school', { grade: $("#s-gr").value, subject: s, topic: $("#s-tp").value }).then(function(j){
     o.textContent = j.text; o.scrollIntoView({ behavior: 'smooth' });
-  }).catch(e => { o.textContent = "Xato: " + e.message; });
+  }).catch(function(e){ o.textContent = "Xato: " + e.message; });
 }
+
 function openCert(){
   var o = $("#o"); o.textContent = "Sertifikat materiallari tayyorlanmoqda...";
-  API('/api/material', { subject: $("#x-sub").value, exam: $("#x-ex").value, k: +$("#x-kind").value }).then(j => {
+  API('/api/material', { subject: $("#x-sub").value, exam: $("#x-ex").value, k: +$("#x-kind").value }).then(function(j){
     o.textContent = j.text; o.scrollIntoView({ behavior: 'smooth' });
-  }).catch(e => { o.textContent = "Xato: " + e.message; });
+  }).catch(function(e){ o.textContent = "Xato: " + e.message; });
 }
 
 function startMic(){
@@ -789,14 +807,15 @@ function startMic(){
   if(!R) return alert("Brauzeringiz ovoz yozishni qo‘llamaydi (Google Chrome tavsiya etiladi).");
   var r = new R(); r.lang = "en-US";
   $("#mic-stat").innerHTML = "<span class='pulse-mic'>● Gapiring, eshityapman...</span>";
-  r.onresult = e => { $("#mic-txt").value = e.results[0][0].transcript; $("#mic-stat").innerHTML = "<span style='color:var(--ok)'>✓ Yozib olindi!</span>"; };
-  r.onerror = () => { $("#mic-stat").innerHTML = "<span style='color:var(--bad)'>Mikrofon xatosi.</span>"; };
+  r.onresult = function(e){ $("#mic-txt").value = e.results[0][0].transcript; $("#mic-stat").innerHTML = "<span style='color:var(--ok)'>✓ Yozib olindi!</span>"; };
+  r.onerror = function(){ $("#mic-stat").innerHTML = "<span style='color:var(--bad)'>Mikrofon xatosi.</span>"; };
   r.start();
 }
+
 function evalSpeaking(){
   var t = $("#mic-txt").value; if(!t) return alert("Avval gapiring yoki matn yozing.");
   var o = $("#o"); o.textContent = "Amir AI muloyimlik bilan tahlil qilmoqda...";
-  API('/api/ai', { prompt: 'Speaking javobini bahola: "' + t + '". Grammatika, Lug\'at, Band ball va maslahatlar ber.' }).then(j => {
+  API('/api/ai', { prompt: "Speaking javobini baholang: " + t + ". Grammatika, lugat boyligi, talaffuz va maslahatlar bering." }).then(function(j){
     o.textContent = j.text; o.scrollIntoView({ behavior: 'smooth' });
   });
 }
@@ -804,11 +823,11 @@ function evalSpeaking(){
 // Arena
 var rSSE = null;
 function createRoom(){
-  API('/api/room/create', { name: $("#ar-name").value || "Jangchi" }).then(j => initArena(j.code, j.id, true));
+  API('/api/room/create', { name: $("#ar-name").value || "Jangchi" }).then(function(j){ initArena(j.code, j.id, true); });
 }
 function joinRoom(){
   var c = $("#ar-code").value; if(!c) return alert("Kodni kiriting!");
-  API('/api/room/join', { name: $("#ar-name").value || "Jangchi", code: c }).then(j => initArena(c, j.id, false));
+  API('/api/room/join', { name: $("#ar-name").value || "Jangchi", code: c }).then(function(j){ initArena(c, j.id, false); });
 }
 function initArena(code, id, isHost){
   $("#ar-box").style.display = "none";
@@ -816,39 +835,39 @@ function initArena(code, id, isHost){
   '<p>Do‘stingizga shu kodni ayting.</p><div id="p-box"></div><div class="rope"><i id="r-pos" style="width:50%"></i><b></b></div><div id="q-box"></div></div>';
   if(rSSE) rSSE.close();
   rSSE = new EventSource('/api/room/' + code + '/events?id=' + id);
-  rSSE.onmessage = e => {
+  rSSE.onmessage = function(e){
     var s = JSON.parse(e.data);
-    $("#p-box").innerHTML = '<p><b>Ko‘k:</b> ' + s.players.filter(p=>p.t===0).map(p=>p.n+' ('+p.s+')').join(', ') + '</p>' +
-    '<p><b>Sariq:</b> ' + s.players.filter(p=>p.t===1).map(p=>p.n+' ('+p.s+')').join(', ') + '</p>';
+    $("#p-box").innerHTML = '<p><b>Ko‘k:</b> ' + s.players.filter(function(p){ return p.t===0; }).map(function(p){ return p.n+' ('+p.s+')'; }).join(', ') + '</p>' +
+    '<p><b>Sariq:</b> ' + s.players.filter(function(p){ return p.t===1; }).map(function(p){ return p.n+' ('+p.s+')'; }).join(', ') + '</p>';
     $("#r-pos").style.width = (5 - s.pos) * 10 + "%";
     var qb = $("#q-box");
-    if(s.state === 'lobby') qb.innerHTML = isHost ? '<button class="btn" onclick="API(\\'/api/room/'+code+'/start\\')">Jangni Boshlash</button>' : '<p>Mezbon boshlashini kuting...</p>';
+    if(s.state === 'lobby') qb.innerHTML = isHost ? '<button class="btn" onclick="API(\\'/api/room/' + code + '/start\\')">Jangni Boshlash</button>' : '<p>Mezbon boshlashini kuting...</p>';
     else if(s.state === 'play'){
       qb.innerHTML = '<h2>' + s.q + '</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
-      s.options.map(o => '<button class="btn sun" onclick="sendAns(\\''+code+'\\',\\''+id+'\\',\\''+o+'\\')">'+o+'</button>').join("") + '</div>';
+      s.options.map(function(o){ return '<button class="btn sun" onclick="sendAns(\\'' + code + '\\',\\'' + id + '\\',\\'' + o + '\\')">' + o + '</button>'; }).join("") + '</div>';
     } else if(s.state === 'finish'){
       qb.innerHTML = '<h2>🎉 ' + (s.winner === 0 ? 'Ko‘k jamoa' : 'Sariq jamoa') + ' g‘alaba qildi!</h2><button class="btn" onclick="show(\\'arena\\')">Yangi Jang</button>';
     }
   };
 }
-function sendAns(code, id, a){ API('/api/room/' + code + '/answer', { id, ans: a }); }
+function sendAns(code, id, a){ API('/api/room/' + code + '/answer', { id: id, ans: a }); }
 
 function loadLeague(){
-  API('/api/league').then(j => {
+  API('/api/league').then(function(j){
     $("#league-board").innerHTML = '<p>Sizning ballaringiz: <b>' + j.me + '</b> (' + j.myLeague + ')</p>' +
     '<table><tr><th>O‘rin</th><th>Ism</th><th>Ball</th><th>Liga</th></tr>' +
-    j.top.map(t => '<tr><td>' + t.rank + '</td><td>' + t.nick + '</td><td><b>' + t.pts + '</b></td><td>' + t.league + '</td></tr>').join("") + '</table>';
+    j.top.map(function(t){ return '<tr><td>' + t.rank + '</td><td>' + t.nick + '</td><td><b>' + t.pts + '</b></td><td>' + t.league + '</td></tr>'; }).join("") + '</table>';
   });
 }
 
 function renderSlides(s, tp){
   $("#sl-res").innerHTML = '<div class="card form" style="margin-top:14px"><h3>' + tp + '</h3><button class="btn sun" id="dp">PowerPoint (.pptx) yuklab olish</button></div>';
-  $("#dp").onclick = () => {
+  $("#dp").onclick = function(){
     var p = new PptxGenJS();
-    s.forEach(x => {
+    s.forEach(function(x){
       var sl = p.addSlide();
       sl.addText(x.title, { x: .5, y: .4, fontSize: 26, bold: true, color: "0E6E7E" });
-      sl.addText(x.points.map(q => ({ text: q, options: { bullet: true, breakLine: true } })), { x: .7, y: 1.5, fontSize: 18, color: "14213D" });
+      sl.addText(x.points.map(function(q){ return { text: q, options: { bullet: true, breakLine: true } }; }), { x: .7, y: 1.5, fontSize: 18, color: "14213D" });
     });
     p.writeFile({ fileName: tp + ".pptx" });
   };
@@ -858,9 +877,9 @@ function renderSlides(s, tp){
 function loadAdmin(){
   var u = $("#adm-u").value, p = $("#adm-p").value;
   $("#adm-err").textContent = "";
-  API('/api/admin/login', { login: u, password: p }).then(j => {
+  API('/api/admin/login', { login: u, password: p }).then(function(j){
     localStorage.setItem('adm_key', j.token);
-    API('/api/admin/overview').then(data => {
+    API('/api/admin/overview').then(function(data){
       $("#adm-l-box").style.display = "none";
       var c = $("#adm-c"); c.style.display = "block";
       c.innerHTML = '<h2>Admin Boshqaruvi</h2>' +
@@ -872,17 +891,17 @@ function loadAdmin(){
       '</div><div id="adm-tc"></div>';
       window.ADM_DATA = data; admTab('users');
     });
-  }).catch(e => { $("#adm-err").textContent = e.message; });
+  }).catch(function(e){ $("#adm-err").textContent = e.message; });
 }
 
 function admTab(t){
   var d = window.ADM_DATA, el = $("#adm-tc");
   if(t === 'users'){
     el.innerHTML = '<table><tr><th>ID</th><th>Ism</th><th>Email</th><th>Tarif</th><th>Ball</th><th>Sovrin</th></tr>' +
-    d.users.map(u => '<tr><td>' + u.id + '</td><td>' + u.name + '</td><td>' + u.email + '</td><td><b>' + u.plan + '</b></td><td>' + u.points + '</td><td>' + (u.prize_msg||'-') + '</td></tr>').join("") + '</table>';
+    d.users.map(function(u){ return '<tr><td>' + u.id + '</td><td>' + u.name + '</td><td>' + u.email + '</td><td><b>' + u.plan + '</b></td><td>' + u.points + '</td><td>' + (u.prize_msg || '-') + '</td></tr>'; }).join("") + '</table>';
   } else if(t === 'logs'){
     el.innerHTML = '<table><tr><th>Vaqt</th><th>Foydalanuvchi</th><th>Harakat</th><th>Tafsilot</th></tr>' +
-    d.activities.map(a => '<tr><td>' + a.created_at.slice(0,19) + '</td><td>' + a.user_name + '</td><td>' + a.action + '</td><td>' + a.detail + '</td></tr>').join("") + '</table>';
+    d.activities.map(function(a){ return '<tr><td>' + a.created_at.slice(0,19) + '</td><td>' + a.user_name + '</td><td>' + a.action + '</td><td>' + a.detail + '</td></tr>'; }).join("") + '</table>';
   } else if(t === 'pricing'){
     el.innerHTML = '<form class="card form" onsubmit="event.preventDefault();saveSettings()">' +
       '<label>Bepul fanlar (vergul bilan):</label><input id="set-subj" value="' + (d.settings.free_subjects||[]).join(', ') + '">' +
@@ -893,7 +912,7 @@ function admTab(t){
       '<button class="btn" style="margin-top:12px">Saqlash</button></form>';
   } else if(t === 'prizes'){
     el.innerHTML = '<form class="card form" onsubmit="event.preventDefault();awardPrize()">' +
-      '<label>Foydalanuvchini tanlang:</label><select id="aw-uid">' + d.users.map(u => '<option value="'+u.id+'">'+u.name+' ('+u.points+' ball)</option>').join("") + '</select>' +
+      '<label>Foydalanuvchini tanlang:</label><select id="aw-uid">' + d.users.map(function(u){ return '<option value="' + u.id + '">' + u.name + ' (' + u.points + ' ball)</option>'; }).join("") + '</select>' +
       '<label>Sovrin tarifi:</label><select id="aw-plan"><option value="month">1 Oylik Bepul Premium</option><option value="year">1 Yillik Bepul Premium</option></select>' +
       '<label>Sovrin tabrigi:</label><input id="aw-msg" value="Tabriklaymiz! Siz musobaqada g‘olib bo‘lib, bepul Premium yutdingiz!">' +
       '<button class="btn sun" style="margin-top:12px">Sovrinni berish</button></form>';
@@ -902,42 +921,56 @@ function admTab(t){
 
 function saveSettings(){
   API('/api/admin/settings', {
-    free_subjects: $("#set-subj").value.split(',').map(x=>x.trim()).filter(Boolean),
-    free_levels: $("#set-lvls").value.split(',').map(x=>x.trim()).filter(Boolean),
+    free_subjects: $("#set-subj").value.split(',').map(function(x){ return x.trim(); }).filter(Boolean),
+    free_levels: $("#set-lvls").value.split(',').map(function(x){ return x.trim(); }).filter(Boolean),
     admin_phone: $("#set-ph").value.trim(), admin_telegram: $("#set-tg").value.trim(),
     season_prize: $("#set-prz").value.trim()
-  }).then(()=>{ alert("Sozlamalar saqlandi!"); location.reload(); });
+  }).then(function(){ alert("Sozlamalar saqlandi!"); location.reload(); });
 }
+
 function awardPrize(){
-  API('/api/admin/award', { userId: +$("#aw-uid").value, plan: $("#aw-plan").value, prizeMessage: $("#aw-msg").value }).then(()=>{
+  API('/api/admin/award', { userId: +$("#aw-uid").value, plan: $("#aw-plan").value, prizeMessage: $("#aw-msg").value }).then(function(){
     alert("Sovrin topshirildi!"); loadAdmin();
   });
 }
 
+// Sahifadagi navigatsiya hodisasi
+document.addEventListener('click', function(e){
+  var btn = e.target.closest('[data-go]');
+  if(btn) show(btn.getAttribute('data-go'));
+  var navBtn = e.target.closest('#nav .n');
+  if(navBtn) show(navBtn.getAttribute('data-v'));
+});
+
 // AI Chatbot
-$("#ai-b").onclick = () => $("#ai-p").classList.toggle("on");
-$("#ai-f").onsubmit = e => {
+$("#ai-b").onclick = function(){ $("#ai-p").classList.toggle("on"); };
+$("#ai-f").onsubmit = function(e){
   e.preventDefault();
   var inp = $("#ai-i"), val = inp.value.trim(); if(!val) return; inp.value = "";
   var m = $("#ai-m");
   m.innerHTML += '<p style="text-align:right"><b>Siz:</b> ' + val + '</p><p id="ai-cur" style="color:var(--br)">Ustoz Amir o‘ylamoqda...</p>';
   m.scrollTop = m.scrollHeight;
-  API('/api/ai', { prompt: val }).then(j => {
+  API('/api/ai', { prompt: val }).then(function(j){
     $("#ai-cur").innerHTML = '<b>Ustoz Amir:</b> ' + j.text;
     $("#ai-cur").removeAttribute('id');
     m.scrollTop = m.scrollHeight;
   });
 };
 
-API('/api/me').then(j => {
+// Sayt ochilishi bilan darhol menyular va bosh sahifani chizamiz
+renderNav();
+show('home');
+
+// Tizimga kirish holatini tekshirish
+API('/api/me').then(function(j){
   ME = j.user; plan = j.plan; used = j.used; SETTINGS = j.settings || {};
-  if(!ME){
-    $("#gate-overlay").style.display = 'flex';
-  } else {
+  if(ME){
     $("#gate-overlay").style.display = 'none';
+  } else {
+    $("#gate-overlay").style.display = 'flex';
   }
   updateMe(); show('home');
-}).catch(() => {
+}).catch(function(){
   $("#gate-overlay").style.display = 'flex';
   updateMe(); show('home');
 });
