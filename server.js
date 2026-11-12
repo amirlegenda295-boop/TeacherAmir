@@ -72,12 +72,11 @@ db.exec(`
   );
 `);
 
-// Admin akkauntini avtomatik yaratish (amir / ayo)
+// Admin akkauntini yaratish (amir / ayo)
 const adminCheck = db.prepare('SELECT id FROM users WHERE LOWER(name) = ? OR LOWER(email) = ?').get(ADMIN_LOGIN, ADMIN_LOGIN);
 if (!adminCheck) {
   const hash = bcrypt.hashSync(ADMIN_PASS, 10);
   db.prepare('INSERT INTO users (name, email, password_hash, role, plan) VALUES (?, ?, ?, ?, ?)').run('Amir (Admin)', ADMIN_LOGIN, hash, 'admin', 'year');
-  console.log(`[Admin]: Standart admin yaratildi (Login: ${ADMIN_LOGIN}, Parol: ${ADMIN_PASS})`);
 }
 
 function initSetting(key, defVal) {
@@ -122,9 +121,9 @@ function getToday() { return new Date().toISOString().split('T')[0]; }
 // Muloyim Amir AI
 async function generateAI(prompt) {
   if (!aiClient) {
-    return `[Amir AI]: Assalomu alaykum, aziz o‘quvchim! Hozirda tizim sinov rejimida ishlamoqda. Gemini API kaliti ulangach, barcha darslar to‘liq tushuntirib beriladi.`;
+    return `[Amir AI]: Assalomu alaykum, aziz o‘quvchim! Hozirda tizim demo rejimida. API ulangach, darslar to‘liq beriladi.`;
   }
-  const systemInstruction = `Sen Amir AI san. O'quvchilarga 50+ til, IELTS, CEFR va barcha maktab fanlarini o'rgatuvchi juda muloyim, xushmuomala, rag'batlantiruvchi va chuqur bilimli ustozsan. Har doim o'quvchiga mehr va samimiyat bilan dars o't.`;
+  const systemInstruction = `Sen Amir AI san. O'quvchilarga 50+ til, IELTS, CEFR va maktab fanlarini o'rgatuvchi juda muloyim, xushmuomala, rag'batlantiruvchi va chuqur bilimli ustozsan. Har doim o'quvchiga mehr bilan va tushunarli tilda dars o't.`;
   try {
     const res = await aiClient.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -155,7 +154,7 @@ app.post('/api/register', async (req, res) => {
 
     const token = jwt.sign({ id: r.lastInsertRowid }, JWT_SECRET, { expiresIn: '30d' });
     res.cookie('auth_token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 30 * 864e5 });
-    logActivity(r.lastInsertRowid, name, 'Ro‘yxatdan o‘tdi', 'Yangi foydalanuvchi hisob yaratdi');
+    logActivity(r.lastInsertRowid, name, 'Ro‘yxatdan o‘tdi', 'Yangi hisob ochildi');
 
     res.json({
       ok: true,
@@ -222,7 +221,7 @@ app.post('/api/lesson', async (req, res) => {
     const user = getUser(req);
     const freeLevels = getSetting('free_levels') || ["A1"];
     if (!freeLevels.includes(level) && (!user || user.plan === 'free')) {
-      return res.status(403).json({ error: `${level} darajadagi darslar Premium hisobda ochiladi. Administrator bilan bog‘laning!` });
+      return res.status(403).json({ error: `${level} daraja darslari Premium hisobda ochiladi. Administrator bilan bog‘laning!` });
     }
     const check = db.prepare('SELECT content FROM lessons WHERE lang = ? AND level = ? AND unit = ?').get(lang, level, unit);
     if (check) return res.json({ text: check.content });
@@ -735,7 +734,10 @@ function show(k){
       var t = $("#sl-tp").value;
       $("#sl-res").innerHTML = "<p>Slaydlar tayyorlanmoqda...</p>";
       API('/api/ai', { prompt: '"' + t + '" mavzusida 5 ta slayd tayyorla. Format faqat JSON: [{"title":"Nom","points":["band1","band2"]}]' }).then(j => {
-        try { renderSlides(JSON.parse(j.text.replace(/```json|```/g,'').trim()), t); }
+        try {
+          var clean = j.text.split(String.fromCharCode(96,96,96)+'json').join('').split(String.fromCharCode(96,96,96)).join('').trim();
+          renderSlides(JSON.parse(clean), t);
+        }
         catch(err) { $("#sl-res").innerHTML = "<p>Qayta urinib ko‘ring.</p>"; }
       });
     };
