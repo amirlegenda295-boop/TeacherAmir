@@ -113,7 +113,7 @@ async function generateAI(prompt) {
   const systemInstruction = `Sen Amir AI san. O'quvchilarga 50+ til, IELTS, CEFR va maktab fanlarini o'rgatuvchi juda muloyim, xushmuomala, rag'batlantiruvchi ustozsan.`;
   try {
     const res = await aiClient.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
       config: { systemInstruction }
     });
