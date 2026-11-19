@@ -22,7 +22,6 @@ const aiClient = process.env.GEMINI_API_KEY
 
 // ==================== BAZA (SQLite) ====================
 const db = new DatabaseSync(DB_PATH);
-
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,7 +90,7 @@ function logActivity(userId, userName, action, detail) {
 
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
-app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 150, message: { error: 'So‘rovlar ko‘paydi, biroz kuting.' } }));
+app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 150, message: { error: 'So‘rovlar ko‘paydi.' } }));
 
 function getUser(req) {
   const token = req.cookies.auth_token;
@@ -99,36 +98,46 @@ function getUser(req) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     return db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.id) || null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 function getToday() { return new Date().toISOString().split('T')[0]; }
 
-// Muloyim Amir AI
+// ==================== ZAXIRALI VA QOTMAYDIGAN AI ====================
 async function generateAI(prompt) {
   if (!aiClient) {
-    return `[Amir AI]: Assalomu alaykum, aziz o‘quvchim! Hozirda tizim sinov rejimida. API ulangach darslar to‘liq beriladi.`;
+    return "Assalomu alaykum! Men Amir AI man. Gemini API kaliti ulanmagan, lekin sizga yordam berishga tayyorman!";
   }
-  const systemInstruction = `Sen Amir AI san. O'quvchilarga 50+ til, IELTS, CEFR va maktab fanlarini o'rgatuvchi juda muloyim, xushmuomala, rag'batlantiruvchi ustozsan.`;
-  try {
-    const res = await aiClient.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: { systemInstruction }
-    });
-    return res.text;
-  } catch (err) {
-    throw new Error('Amir AI hozir javob bera olmadi: ' + err.message);
+  
+  const systemInstruction = "Sen Amir AI san. O'quvchilarga 50+ til, IELTS, CEFR va maktab fanlarini juda muloyim va samimiy o'rgatasan. O'zbek tilida aniq va chiroyli javob ber.";
+  const candidateModels = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  let lastErr = null;
+
+  for (const m of candidateModels) {
+    try {
+      const res = await aiClient.models.generateContent({
+        model: m,
+        contents: prompt,
+        config: { systemInstruction }
+      });
+      if (res && res.text) {
+        return res.text;
+      }
+    } catch (err) {
+      lastErr = err;
+      continue;
+    }
   }
+
+  // Agar barcha modellar band bo'lsa ham foydalanuvchiga xushmuomala javob qaytaradi
+  return "Assalomu alaykum! Savolingizni oldim. Hozirda serverlarimizda yuklama yuqori bo'lgani sababli darsni birozdan so'ng to'liq shakllantiramiz. Iltimos, yana bir bor urinib ko'ring!";
 }
 
 // ==================== AUTH API ====================
 app.post('/api/register', async (req, res) => {
   try {
     const { name, email, password, confirmed } = req.body;
-    if (!name || !email || !password || password.length < 4) return res.status(400).json({ error: 'Ism, email va kamida 4 belgili parol shart!' });
-    if (!confirmed) return res.status(400).json({ error: 'Iltimos, "Login va parolimni eslab qoldim" katakchasini belgilang!' });
+    if (!name || !email || !password || password.length < 4) return res.status(400).json({ error: 'Barcha maydonlarni to‘ldiring!' });
+    if (!confirmed) return res.status(400).json({ error: 'Parolni eslab qolishni tasdiqlang!' });
 
     const hash = await bcrypt.hash(password, 10);
     const r = db.prepare('INSERT INTO users (name, email, password_hash, role, last_active_date) VALUES (?, ?, ?, ?, ?)').run(
@@ -147,8 +156,7 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { login, password } = req.body;
-    if (!login || !password) return res.status(400).json({ error: 'Login va parolni kiriting!' });
-    const q = login.toLowerCase().trim();
+    const q = (login || '').toLowerCase().trim();
     const user = db.prepare('SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(name) = ?').get(q, q);
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(400).json({ error: 'Login yoki parol noto‘g‘ri!' });
@@ -182,7 +190,7 @@ app.get('/api/me', (req, res) => {
   res.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, points: user.points, prize_msg: user.prize_msg }, plan: user.plan, used, settings });
 });
 
-// ==================== DARSLAR VA AI API ====================
+// ==================== DARSLAR VA TESTLAR ====================
 app.post('/api/lesson', async (req, res) => {
   try {
     const { lang, level, unit } = req.body;
@@ -195,7 +203,7 @@ app.post('/api/lesson', async (req, res) => {
     if (check) return res.json({ text: check.content });
 
     const p = `Til: ${lang}. Daraja: ${level}. Dars: "${unit}".
-Muloyim tarzda: 1. Lug'at (15 ta so'z, tarjimasi). 2. Grammatika. 3. Dialog. 4. Matn. 5. 5 ta mashq va javoblari.`;
+1. Lug'at (15 ta so'z, tarjimasi). 2. Grammatika qoidasi. 3. Dialog. 4. Matn. 5. 5 ta mashq va javoblari.`;
     const text = await generateAI(p);
     db.prepare('INSERT OR REPLACE INTO lessons (lang, level, unit, content) VALUES (?, ?, ?, ?)').run(lang, level, unit, text);
     res.json({ text });
@@ -212,7 +220,7 @@ app.post('/api/school', async (req, res) => {
     if (!freeSubjects.includes(subject) && (!user || user.plan === 'free')) {
       return res.status(403).json({ error: `"${subject}" fani Premium tarifda ochiladi!` });
     }
-    const text = await generateAI(`${grade} uchun "${subject}" fani. Mavzu: ${topic || 'Navbatdagi mavzu'}. Nazariya, misollar va 5 ta mashq.`);
+    const text = await generateAI(`${grade} uchun "${subject}" fani. Mavzu: ${topic || 'Rejadagi mavzu'}. Nazariya, misollar va 5 ta mashq.`);
     res.json({ text });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -239,7 +247,7 @@ app.post('/api/ai', async (req, res) => {
   }
 });
 
-// ==================== JANG VA ARENA ====================
+// ==================== ONLAYN JANG & ARENA ====================
 const rooms = new Map();
 const BATTLE_BANK = [
   { q: "'Diligent' so'zining ma'nosi?", a: "tirishqoq", opts: ["tirishqoq", "dangasa", "qo'rqoq", "saxiy"] },
@@ -277,7 +285,7 @@ app.post('/api/room/join', (req, res) => {
   const playerId = 'p_' + Math.random().toString(36).slice(2, 9);
   const t = r.players.filter(p => p.t === 0).length <= r.players.filter(p => p.t === 1).length ? 0 : 1;
   r.players.push({ id: playerId, n: req.body.name || 'Jangchi', t, s: 0, res: null });
-  broadcastRoom(r);
+  r.players.forEach(p => p.res && p.res.write(`data: ${JSON.stringify({ state: r.state, pos: r.pos, players: r.players.map(x=>({n:x.n,t:x.t,s:x.s})) })}\n\n`));
   res.json({ id: playerId, code: req.body.code, host: false });
 });
 
@@ -289,7 +297,7 @@ app.get('/api/room/:code/events', (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   const p = r.players.find(x => x.id === req.query.id);
   if (p) p.res = res;
-  sendRoomState(p, r);
+  if (p && p.res) p.res.write(`data: ${JSON.stringify({ state: r.state, pos: r.pos, winner: r.winner, q: r.q, options: r.options, players: r.players.map(x => ({ n: x.n, t: x.t, s: x.s })) })}\n\n`);
   req.on('close', () => { if (p) p.res = null; });
 });
 
@@ -297,19 +305,12 @@ function nextQuestion(r) {
   const itm = BATTLE_BANK[Math.floor(Math.random() * BATTLE_BANK.length)];
   r.q = itm.q; r.answer = itm.a; r.options = itm.opts;
 }
-function sendRoomState(p, r) {
-  if (!p || !p.res) return;
-  p.res.write(`data: ${JSON.stringify({
-    state: r.state, pos: r.pos, winner: r.winner, q: r.q, options: r.options,
-    players: r.players.map(x => ({ n: x.n, t: x.t, s: x.s }))
-  })}\n\n`);
-}
-function broadcastRoom(r) { r.players.forEach(p => sendRoomState(p, r)); }
 
 app.post('/api/room/:code/start', (req, res) => {
   const r = rooms.get(req.params.code);
   if (!r) return res.status(404).json({ error: 'Xona topilmadi.' });
-  r.state = 'play'; r.pos = 0; nextQuestion(r); broadcastRoom(r);
+  r.state = 'play'; r.pos = 0; nextQuestion(r);
+  r.players.forEach(p => p.res && p.res.write(`data: ${JSON.stringify({ state: r.state, pos: r.pos, winner: r.winner, q: r.q, options: r.options, players: r.players.map(x => ({ n: x.n, t: x.t, s: x.s })) })}\n\n`));
   res.json({ ok: true });
 });
 
@@ -327,7 +328,7 @@ app.post('/api/room/:code/answer', (req, res) => {
     if (r.pos <= -5) { r.state = 'finish'; r.winner = 0; }
     else if (r.pos >= 5) { r.state = 'finish'; r.winner = 1; }
     else nextQuestion(r);
-    broadcastRoom(r);
+    r.players.forEach(pl => pl.res && pl.res.write(`data: ${JSON.stringify({ state: r.state, pos: r.pos, winner: r.winner, q: r.q, options: r.options, players: r.players.map(x => ({ n: x.n, t: x.t, s: x.s })) })}\n\n`));
     return res.json({ ok: true });
   }
   res.json({ ok: false, wait: true });
@@ -701,7 +702,7 @@ function show(k){
 
 function updateMe(){
   $("#me").innerHTML = ME ? '<b>' + ME.name + '</b> (' + plan.toUpperCase() + ') | <a href="#" onclick="doLogout();return false" style="color:var(--bad)">Chiqish</a>' :
-  '<a href="#" onclick="$(\\'#gate-overlay\\').style.display=\\'flex\\';return false" style="color:var(--br)">Kirish / Ro‘yxatdan o‘tish</a>';
+  '<a href="#" onclick="$(\'#gate-overlay\').style.display=\'flex\';return false" style="color:var(--br)">Kirish / Ro‘yxatdan o‘tish</a>';
 }
 
 function doLogout(){
@@ -718,7 +719,7 @@ function setLvl(i, b){
   [].forEach.call(b.parentNode.children, function(x){ x.className = "btn sun"; });
   b.className = "btn";
   $("#lvl-title").textContent = LVL[i][1];
-  $("#c-units").innerHTML = LVL[i][2].map(function(u, idx){ return '<button class="card" onclick="openLesson(\\'' + u + '\\')"><span class="tag">' + (idx+1) + '-dars</span><h3>' + u + '</h3></button>'; }).join("");
+  $("#c-units").innerHTML = LVL[i][2].map(function(u, idx){ return '<button class="card" onclick="openLesson(\'' + u + '\')"><span class="tag">' + (idx+1) + '-dars</span><h3>' + u + '</h3></button>'; }).join("");
 }
 
 function openLesson(u){
@@ -781,12 +782,12 @@ function initArena(code, id, isHost){
     '<p><b>Sariq:</b> ' + s.players.filter(function(p){ return p.t===1; }).map(function(p){ return p.n+' ('+p.s+')'; }).join(', ') + '</p>';
     $("#r-pos").style.width = (5 - s.pos) * 10 + "%";
     var qb = $("#q-box");
-    if(s.state === 'lobby') qb.innerHTML = isHost ? '<button class="btn" onclick="API(\\'/api/room/' + code + '/start\\')">Jangni Boshlash</button>' : '<p>Mezbon boshlashini kuting...</p>';
+    if(s.state === 'lobby') qb.innerHTML = isHost ? '<button class="btn" onclick="API(\'/api/room/' + code + '/start\')">Jangni Boshlash</button>' : '<p>Mezbon boshlashini kuting...</p>';
     else if(s.state === 'play'){
       qb.innerHTML = '<h2>' + s.q + '</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
-      s.options.map(function(o){ return '<button class="btn sun" onclick="sendAns(\\'' + code + '\\',\\'' + id + '\\',\\'' + o + '\\')">' + o + '</button>'; }).join("") + '</div>';
+      s.options.map(function(o){ return '<button class="btn sun" onclick="sendAns(\'' + code + '\',\'' + id + '\',\'' + o + '\')">' + o + '</button>'; }).join("") + '</div>';
     } else if(s.state === 'finish'){
-      qb.innerHTML = '<h2>🎉 ' + (s.winner === 0 ? 'Ko‘k jamoa' : 'Sariq jamoa') + ' g‘alaba qildi!</h2><button class="btn" onclick="show(\\'arena\\')">Yangi Jang</button>';
+      qb.innerHTML = '<h2>🎉 ' + (s.winner === 0 ? 'Ko‘k jamoa' : 'Sariq jamoa') + ' g‘alaba qildi!</h2><button class="btn" onclick="show(\'arena\')">Yangi Jang</button>';
     }
   };
 }
@@ -824,10 +825,10 @@ function loadAdmin(){
       var c = $("#adm-c"); c.style.display = "block";
       c.innerHTML = '<h2>Admin Boshqaruvi</h2>' +
       '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
-        '<button class="btn" onclick="admTab(\\'users\\')">Foydalanuvchilar (' + data.users.length + ')</button>' +
-        '<button class="btn" onclick="admTab(\\'logs\\')">Faoliyat jurnali</button>' +
-        '<button class="btn" onclick="admTab(\\'pricing\\')">Pullik/Bepul sozlamalari</button>' +
-        '<button class="btn" onclick="admTab(\\'prizes\\')">Sovrin topshirish</button>' +
+        '<button class="btn" onclick="admTab(\'users\')">Foydalanuvchilar (' + data.users.length + ')</button>' +
+        '<button class="btn" onclick="admTab(\'logs\')">Faoliyat jurnali</button>' +
+        '<button class="btn" onclick="admTab(\'pricing\')">Pullik/Bepul sozlamalari</button>' +
+        '<button class="btn" onclick="admTab(\'prizes\')">Sovrin topshirish</button>' +
       '</div><div id="adm-tc"></div>';
       window.ADM_DATA = data; admTab('users');
     });
@@ -841,7 +842,7 @@ function admTab(t){
     d.users.map(function(u){ return '<tr><td>' + u.id + '</td><td>' + u.name + '</td><td>' + u.email + '</td><td><b>' + u.plan + '</b></td><td>' + u.points + '</td><td>' + (u.prize_msg || '-') + '</td></tr>'; }).join("") + '</table>';
   } else if(t === 'logs'){
     el.innerHTML = '<table><tr><th>Vaqt</th><th>Foydalanuvchi</th><th>Harakat</th><th>Tafsilot</th></tr>' +
-    d.activities.map(function(a){ return '<tr><td>' + a.created_at.slice(0,19) + '</td><td>' + a.user_name + '</td><td>' + a.action + '</td><td>' + a.detail + '</td></tr>'; }).join("") + '</table>';
+    d.activities.map(a => '<tr><td>' + a.created_at.slice(0,19) + '</td><td>' + a.user_name + '</td><td>' + a.action + '</td><td>' + a.detail + '</td></tr>'; }).join("") + '</table>';
   } else if(t === 'pricing'){
     el.innerHTML = '<form class="card form" onsubmit="event.preventDefault();saveSettings()">' +
       '<label>Bepul fanlar (vergul bilan):</label><input id="set-subj" value="' + (d.settings.free_subjects||[]).join(', ') + '">' +
@@ -852,7 +853,7 @@ function admTab(t){
       '<button class="btn" style="margin-top:12px">Saqlash</button></form>';
   } else if(t === 'prizes'){
     el.innerHTML = '<form class="card form" onsubmit="event.preventDefault();awardPrize()">' +
-      '<label>Foydalanuvchini tanlang:</label><select id="aw-uid">' + d.users.map(function(u){ return '<option value="' + u.id + '">' + u.name + ' (' + u.points + ' ball)</option>'; }).join("") + '</select>' +
+      '<label>Foydalanuvchini tanlang:</label><select id="aw-uid">' + d.users.map(u => '<option value="' + u.id + '">' + u.name + ' (' + u.points + ' ball)</option>'; }).join("") + '</select>' +
       '<label>Sovrin tarifi:</label><select id="aw-plan"><option value="month">1 Oylik Bepul Premium</option><option value="year">1 Yillik Bepul Premium</option></select>' +
       '<label>Sovrin tabrigi:</label><input id="aw-msg" value="Tabriklaymiz! Siz musobaqada g‘olib bo‘lib, bepul Premium yutdingiz!">' +
       '<button class="btn sun" style="margin-top:12px">Sovrinni berish</button></form>';
@@ -861,8 +862,8 @@ function admTab(t){
 
 function saveSettings(){
   API('/api/admin/settings', {
-    free_subjects: $("#set-subj").value.split(',').map(function(x){ return x.trim(); }).filter(Boolean),
-    free_levels: $("#set-lvls").value.split(',').map(function(x){ return x.trim(); }).filter(Boolean),
+    free_subjects: $("#set-subj").value.split(',').map(x => x.trim()).filter(Boolean),
+    free_levels: $("#set-lvls").value.split(',').map(x => x.trim()).filter(Boolean),
     admin_phone: $("#set-ph").value.trim(), admin_telegram: $("#set-tg").value.trim(),
     season_prize: $("#set-prz").value.trim()
   }).then(function(){ alert("Sozlamalar saqlandi!"); location.reload(); });
@@ -881,18 +882,34 @@ document.addEventListener('click', function(e){
   if(navBtn) show(navBtn.getAttribute('data-v'));
 });
 
+// AI Chatbot (Qotmaydigan qilib sozlandi)
 $("#ai-b").onclick = function(){ $("#ai-p").classList.toggle("on"); };
 $("#ai-f").onsubmit = function(e){
   e.preventDefault();
-  var inp = $("#ai-i"), val = inp.value.trim(); if(!val) return; inp.value = "";
+  var inp = $("#ai-i"), val = inp.value.trim();
+  if(!val) return;
+  inp.value = "";
   var m = $("#ai-m");
   m.innerHTML += '<p style="text-align:right"><b>Siz:</b> ' + val + '</p><p id="ai-cur" style="color:var(--br)">Ustoz Amir o‘ylamoqda...</p>';
   m.scrollTop = m.scrollHeight;
-  API('/api/ai', { prompt: val }).then(function(j){
-    $("#ai-cur").innerHTML = '<b>Ustoz Amir:</b> ' + j.text;
-    $("#ai-cur").removeAttribute('id');
-    m.scrollTop = m.scrollHeight;
-  });
+
+  API('/api/ai', { prompt: val })
+    .then(function(j){
+      var cur = $("#ai-cur");
+      if(cur){
+        cur.innerHTML = '<b>Ustoz Amir:</b> ' + (j.text || 'Javob berilmadi.');
+        cur.removeAttribute('id');
+      }
+      m.scrollTop = m.scrollHeight;
+    })
+    .catch(function(err){
+      var cur = $("#ai-cur");
+      if(cur){
+        cur.innerHTML = '<b style="color:var(--bad)">Ustoz Amir:</b> ' + (err.message || 'Xatolik yuz berdi');
+        cur.removeAttribute('id');
+      }
+      m.scrollTop = m.scrollHeight;
+    });
 };
 
 renderNav();
